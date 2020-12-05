@@ -206,7 +206,7 @@ class Tracer:
 
     '''
 
-    def __init__(self, output=None, watch=(), watch_explode=(), depth=1,
+    def __init__(self, output=None, watch=(), watch_explode=(), depth=1, color=0,
                  prefix='', overwrite=False, thread_info=False, custom_repr=(),
                  max_variable_length=100, normalize=False, relative_time=False):
         self._write = get_write_function(output, overwrite)
@@ -221,6 +221,7 @@ class Tracer:
         self.frame_to_local_reprs = {}
         self.start_times = {}
         self.depth = depth
+        self.color = color
         self.prefix = prefix
         self.thread_info = thread_info
         self.thread_info_padding = 0
@@ -325,7 +326,7 @@ class Tracer:
         elapsed_time_string = pycompat.timedelta_format(duration)
         indent = ' ' * 4 * (thread_global.depth + 1)
         self.write(
-            '\033[33m'+'{indent}Elapsed time: {elapsed_time_string}'+'\033[0m'.format(**locals())
+            '{indent}Elapsed time: {elapsed_time_string}'.format(**locals())
         )
         #                                                                     #
         ### Finished writing elapsed time. ####################################
@@ -346,8 +347,10 @@ class Tracer:
         # We should trace this line either if it's in the decorated function,
         # or the user asked to go a few levels deeper and we're within that
         # number of levels deeper.
-
+        color_mode = self.color
         if not (frame.f_code in self.target_codes or frame in self.target_frames):
+            if self.color == 1:
+                color_mode = 1
             if self.depth == 1:
                 # We did the most common and quickest check above, because the
                 # trace function runs so incredibly often, therefore it's
@@ -397,8 +400,10 @@ class Tracer:
         source_path, source = get_path_and_source_from_frame(frame)
         source_path = source_path if not self.normalize else os.path.basename(source_path)
         if self.last_source_path != source_path:
-            self.write('\033[33m' + u'{indent}Source path:... {source_path}' + '\033[0m'.
-                       format(**locals()))
+            if color_mode == 1:
+                self.write('\033[33m' + u'{indent}Source path:... {source_path}' + '\033[0m'.format(**locals()))
+            else:
+                self.write(u'{indent}Source path:... {source_path}'.format(**locals()))
             self.last_source_path = source_path
         source_line = source[line_no - 1]
         thread_info = ""
@@ -426,16 +431,25 @@ class Tracer:
 
         for name, value_repr in local_reprs.items():
             if name not in old_local_reprs:
-                str = '{indent}{newish_string}{name} = {value_repr}'.format( **locals())
+                str = '{indent}{newish_string}{name} = {value_repr}'.format(**locals())
                 idx = str.find(":")
-                if("Start" in str):
-                    self.write('\033[33m' + str[0:idx+3] + '\033[34m' + str[idx+3:] + '\033[0m')
+                if ("Start" in str):
+                    if color_mode == 1:
+                        self.write('\033[95m' + str[0:idx + 3] + '\033[34m' + str[idx + 3:] + '\033[0m')
+                    else:
+                        self.write(str[0:idx + 3] + str[idx + 3:])
                 else:
-                    self.write('\033[33m' + str[0:idx+8] + '\033[34m' + str[idx+8:] + '\033[0m')
+                    if color_mode == 1:
+                        self.write('\033[33m' + str[0:idx + 8] + '\033[34m' + str[idx + 8:] + '\033[0m')
+                    else:
+                        self.write(str[0:idx + 8] + str[idx + 8:])
             elif old_local_reprs[name] != value_repr:
                 str = '{indent}Modified var:.. {name} = {value_repr}'.format(**locals())
                 idx = str.find("..")
-                self.write('\033[33m' + str[0:idx+2] + '\033[34m' + str[idx+2:] + '\033[0m')
+                if color_mode == 1:
+                    self.write('\033[33m' + str[0:idx + 2] + '\033[34m' + str[idx + 2:] + '\033[0m')
+                else:
+                    self.write(str[0:idx + 2] + str[idx + 2:] )
 
         #                                                                     #
         ### Finished newish and modified variables. ###########################
@@ -483,10 +497,12 @@ class Tracer:
             idx = str.find(" ")
 
             for s in str.split():
-                if(s.isdigit()): num = s
+                if s.isdigit(): num = s
             numidx = str.find(" " + num + " ")
-            self.write('\033[30m' + str[:idx] + '\033[32m' + str[idx:numidx] + '\033[36m' + str[numidx:] + '\033[0m')
-
+            if color_mode ==1:
+                self.write('\033[30m' + str[:idx] + '\033[32m' + str[idx:numidx] + '\033[36m' + str[numidx:] + '\033[0m')
+            else:
+                self.write(str[:idx]  + str[idx:numidx] + str[numidx:])
         if event == 'return':
             self.frame_to_local_reprs.pop(frame, None)
             self.start_times.pop(frame, None)
@@ -498,14 +514,22 @@ class Tracer:
                                                             self.max_variable_length,
                                                             self.normalize,
                                                             )
-                self.write('\033[95m' + '{indent}Return value:.. {return_value_repr}'.
+                if color_mode == 1:
+                    self.write('\033[95m' + '{indent}Return value:... {return_value_repr}'.
                            format(**locals()) + '\033[0m')
+                else:
+                    self.write('{indent}Return value:... {return_value_repr}'.
+                               format(**locals()))
 
         if event == 'exception':
             exception = '\n'.join(traceback.format_exception_only(*arg[:2])).strip()
             if self.max_variable_length:
                 exception = utils.truncate(exception, self.max_variable_length)
-            self.write('\033[31m' + '{indent}Exception:..... {exception}'.
+            if color_mode == 1:
+                self.write('\033[31m' + '{indent}Exception:..... {exception}'.
                        format(**locals()))
+            else:
+                self.write('{indent}Exception:..... {exception}'.
+                           format(**locals()))
 
         return self.trace
