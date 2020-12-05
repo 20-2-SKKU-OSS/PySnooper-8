@@ -401,7 +401,7 @@ class Tracer:
         source_path = source_path if not self.normalize else os.path.basename(source_path)
         if self.last_source_path != source_path:
             if color_mode == 1:
-                self.write('\033[33m' + u'{indent}Source path:... {source_path}' + '\033[0m'.format(**locals()))
+                self.write('\033[33m' u'{indent}Source path:... {source_path}' '\033[0m'.format(**locals()))
             else:
                 self.write(u'{indent}Source path:... {source_path}'.format(**locals()))
             self.last_source_path = source_path
