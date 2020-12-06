@@ -1,4 +1,4 @@
-# PySnooper - 디버깅에 print를 쓰지 말자 #
+# PySnooper - 더이상 디버깅에 print를 쓰지 말자 #
 
 [English](./README.md) | [Korean](./README_KR.md)
 
